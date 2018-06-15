@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue May 22 12:04:07 2018
+
+@author: kaori
+"""
+
+import matplotlib.pyplot as plt
+import numpy as np
+np.random.seed(100)
+
+
+
+# PART 1 - the matplotlib object hierarchy
+'''
+Figure -- Axes -- tick mark, lines, legend, labels, text boxes
+'''
+fig,_ = plt.subplots()
+type(fig)
+
+# see the first tick of the y axis of the first Axes object
+one_tick = fig.axes[0].yaxis.get_major_ticks()[0]
+type(one_tick)
+
+
+
+# PART 2 - stateful and stateless interfaces
+'''
+(1) The stateful interface makes its calls with plt.plot() and other top-level pyplot functions. There is only ever one Figure or Axes that you’re manipulating at a given time, and you don’t need to explicitly refer to it.
+
+(2) Modifying the underlying objects directly is the object-oriented approach. We usually do this by calling methods of an Axes object, which is the object that represents a plot itself.
+
+From here on out, we’ll mostly rely on the stateless (object-oriented) approach, which is more customizable and comes in handy as graphs become more complex.
+'''
+
+
+
+# PART 3 -- one axes within one figure
+
+# a stacked area graph with 3 time series
+rng = np.arange(50)
+rnd = np.random.randint(0, 10, size=(3, rng.size))
+yrs = 1950 + rng
+
+# defined one Figure (fig) containing one Axes (a plot, ax)
+fig, ax = plt.subplots(figsize=(5,3))
+
+# call methods of ax directly to create a stacked area chart and to add a legend, title, and y-axis label
+ax.stackplot(yrs, rnd+rng, labels=['A', 'B', 'C'])
+ax.set_title('Combined Debt Growth Over Time')
+ax.legend(loc='upper left')
+ax.set_ylabel('Total Debt')
+ax.set_xlim(xmin=yrs[0], xmax=yrs[-1])
+
+# tight_layout() applies to the Figure object as a whole to clean up whitespace padding
+fig.tight_layout()
+
+
+
+# PART 4 -- multiple axes(subplots) within one figure
+x = np.random.randint(1, 11, size=50)
+y = 3*x + np.random.randint(1, 5, size=x.shape)
+# stack 1-D arrays as columns into a 2-D array.
+data = np.column_stack((x,y))
+
+# (1) Scatter plot
+# the returned result of plt.subplots(1, 2) is now a Figure object and a NumPy array of Axes objects
+fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(8,4))
+ax1.scatter(x=x, y=y, marker='o', c='r', edgecolor='g')
+# Text inside dollar signs utilizes TeX markup to put variables in italics
+ax1.set_title('Scatter: $x$ versus $y$')
+ax1.set_xlabel('$x$')
+ax1.set_ylabel('$y$')
+
+# (2) Histogram
+ax2.hist(data, bins=np.arange(data.min(), data.max()), label = ('x', 'y'))
+ax2.legend(loc=(0.65, 0.8))
+ax2.set_title('Frequencies of $x$ and $y$')
+# modify the yaxis belonging to the second Axes, placing its ticks and ticklabels to the right
+ax2.yaxis.tick_right()
+fig.tight_layout()
+
+
+
+# PART 5 -- more realistic example
+from io import BytesIO
+import tarfile
+from urllib.request import urlopen
+url = 'http://www.dcc.fc.up.pt/~ltorgo/Regression/cal_housing.tgz'
+b = BytesIO(urlopen(url).read())
+
+fpath = 'CaliforniaHousing/cal_housing.data'
+with tarfile.open(mode='r', fileobj=b) as archive:
+    housing = np.loadtxt(archive.extractfile(fpath), delimiter=',')
+
+y = housing[:,-1]
+pop, age = housing[:,[4,7]].T
+
+# define a “helper function” that places a text box inside of a plot and acts as an “in-plot title”
+def add_titlebox(ax, text):
+    ax.text(0.55, 0.8, text, 
+            horizontalalignment='center',
+            transform=ax.transAxes,
+            bbox=dict(facecolor='white', alpha=0.6),
+            fontsize=12.5)
+    return ax
+
+# create more customized layout
+gridsize = (3,2)
+fig = plt.figure(figsize=(12,8))
+ax1 = plt.subplot2grid(gridsize, (0,0), colspan=2, rowspan=2)
+ax2 = plt.subplot2grid(gridsize, (2,0))
+ax3 = plt.subplot2grid(gridsize, (2,1))
+
+'''
+Visually, there isn’t much differentiation in color (the y-variable) as we move up-and-down the y-axis, indicating that home age seems to be a stonger determinant of house value.
+'''
+
+ax1.set_title('Home value as a function of home age & area population', fontsize=14)
+sctr = ax1.scatter(x=age, y=pop, c=y, cmap='RdYlGn')
+plt.colorbar(sctr, ax=ax1, format='$%d')
+ax1.set_yscale('log')
+ax2.hist(age, bins='auto')
+ax3.hist(pop, bins='auto', log=True)
+add_titlebox(ax2, 'Histogram: home age')
+add_titlebox(ax3, 'Histogram: area population (log scl.)')
+
+
+
+# PART 6 -- Other operations
+# use id() to display the address of the object in memory 
+fig1,_ = plt.subplots()
+id(fig1) == id(plt.gcf())
+
+fig2,_ = plt.subplots()
+id(fig2) == id(plt.gcf())
+
+# both figures are still hanging around in memory, each with a corresponding ID number 
+plt.get_fignums()
+
+#  get all of the Figures themselves is with a mapping of plt.figure() to each of these integers
+def get_all_figures():
+    return [plt.figure(i) for i in plt.get_fignums()]
+
+# You’ll want to explicitly close each of plots after use to avoid a MemoryError. plt.close()
+plt.close('all')
+
+
+
+# PART 7 -- Colored grid
+'''
+use imshow() and matshow()
+to visualize a raw numerical array as a colored grid
+'''
+# create grids using numpy
+x = np.diag(np.arange(2, 12))[::-1]
+x[np.diag_indices_from(x[::-1])] = np.arange(2, 12)
+x2 = np.arange(x.size).reshape(x.shape)
+
+# we toggle “off” all axis labels and ticks by using a dictionary comprehension and passing the result to ax.tick_params()
+sides = ('left', 'right', 'top', 'bottom')
+nolabels = {s : False for s in sides}
+nolabels.update({'label%s' % s : False for s in sides})
+
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+with plt.rc_context(rc={'axes.grid':False}):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize = (8,4))
+    ax1.matshow(x)
+    img2 = ax2.matshow(x2, cmap='RdYlGn_r')
+    for ax in (ax1, ax2):
+        ax.tick_params(axis='both', which='both', **nolabels)
+    for i, j in zip(*x.nonzero()):
+        ax1.text(j, i, x[i, j], color='white', ha='center', va='center')
+        
+    divider = make_axes_locatable(ax2)
+    cax = divider.append_axes("right", size='5%', pad=0)
+    plt.colorbar(img2, cax=cax, ax=[ax1, ax2])
+    fig.suptitle('Heatmaps with `Axes.matshow`', fontsize=16)
+    
+
+
+
+# showcase example 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator, MultipleLocator, FuncFormatter
+
+
+np.random.seed(19680801)
+
+X = np.linspace(0.5, 3.5, 100)
+Y1 = 3+np.cos(X)
+Y2 = 1+np.cos(1+X/0.75)/2
+Y3 = np.random.uniform(Y1, Y2, len(X))
+
+fig = plt.figure(figsize=(8, 8))
+ax = fig.add_subplot(1, 1, 1, aspect=1)
+
+
+def minor_tick(x, pos):
+    if not x % 1.0:
+        return ""
+    return "%.2f" % x
+
+ax.xaxis.set_major_locator(MultipleLocator(1.000))
+ax.xaxis.set_minor_locator(AutoMinorLocator(4))
+ax.yaxis.set_major_locator(MultipleLocator(1.000))
+ax.yaxis.set_minor_locator(AutoMinorLocator(4))
+ax.xaxis.set_minor_formatter(FuncFormatter(minor_tick))
+
+ax.set_xlim(0, 4)
+ax.set_ylim(0, 4)
+
+ax.tick_params(which='major', width=1.0)
+ax.tick_params(which='major', length=10)
+ax.tick_params(which='minor', width=1.0, labelsize=10)
+ax.tick_params(which='minor', length=5, labelsize=10, labelcolor='0.25')
+
+ax.grid(linestyle="--", linewidth=0.5, color='.25', zorder=-10)
+
+ax.plot(X, Y1, c=(0.25, 0.25, 1.00), lw=2, label="Blue signal", zorder=10)
+ax.plot(X, Y2, c=(1.00, 0.25, 0.25), lw=2, label="Red signal")
+ax.plot(X, Y3, linewidth=0,
+        marker='o', markerfacecolor='w', markeredgecolor='k')
+
+ax.set_title("Anatomy of a figure", fontsize=20, verticalalignment='bottom')
+ax.set_xlabel("X axis label")
+ax.set_ylabel("Y axis label")
+
+ax.legend()
+
+
+def circle(x, y, radius=0.15):
+    from matplotlib.patches import Circle
+    from matplotlib.patheffects import withStroke
+    circle = Circle((x, y), radius, clip_on=False, zorder=10, linewidth=1,
+                    edgecolor='black', facecolor=(0, 0, 0, .0125),
+                    path_effects=[withStroke(linewidth=5, foreground='w')])
+    ax.add_artist(circle)
+
+
+def text(x, y, text):
+    ax.text(x, y, text, backgroundcolor="white",
+            ha='center', va='top', weight='bold', color='blue')
+
+
+# Minor tick
+circle(0.50, -0.10)
+text(0.50, -0.32, "Minor tick label")
+
+# Major tick
+circle(-0.03, 4.00)
+text(0.03, 3.80, "Major tick")
+
+# Minor tick
+circle(0.00, 3.50)
+text(0.00, 3.30, "Minor tick")
+
+# Major tick label
+circle(-0.15, 3.00)
+text(-0.15, 2.80, "Major tick label")
+
+# X Label
+circle(1.80, -0.27)
+text(1.80, -0.45, "X axis label")
+
+# Y Label
+circle(-0.27, 1.80)
+text(-0.27, 1.6, "Y axis label")
+
+# Title
+circle(1.60, 4.13)
+text(1.60, 3.93, "Title")
+
+# Blue plot
+circle(1.75, 2.80)
+text(1.75, 2.60, "Line\n(line plot)")
+
+# Red plot
+circle(1.20, 0.60)
+text(1.20, 0.40, "Line\n(line plot)")
+
+# Scatter plot
+circle(3.20, 1.75)
+text(3.20, 1.55, "Markers\n(scatter plot)")
+
+# Grid
+circle(3.00, 3.00)
+text(3.00, 2.80, "Grid")
+
+# Legend
+circle(3.70, 3.80)
+text(3.70, 3.60, "Legend")
+
+# Axes
+circle(0.5, 0.5)
+text(0.5, 0.3, "Axes")
+
+# Figure
+circle(-0.3, 0.65)
+text(-0.3, 0.45, "Figure")
+
+color = 'blue'
+ax.annotate('Spines', xy=(4.0, 0.35), xycoords='data',
+            xytext=(3.3, 0.5), textcoords='data',
+            weight='bold', color=color,
+            arrowprops=dict(arrowstyle='->',
+                            connectionstyle="arc3",
+                            color=color))
+
+ax.annotate('', xy=(3.15, 0.0), xycoords='data',
+            xytext=(3.45, 0.45), textcoords='data',
+            weight='bold', color=color,
+            arrowprops=dict(arrowstyle='->',
+                            connectionstyle="arc3",
+                            color=color))
+
+ax.text(4.0, -0.4, "Made with http://matplotlib.org",
+        fontsize=10, ha="right", color='.5')
+
+plt.show()
